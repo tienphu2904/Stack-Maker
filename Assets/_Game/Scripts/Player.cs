@@ -4,75 +4,179 @@ using UnityEngine;
 
 public class Player : MonoBehaviour
 {
-    public enum Direct { Forward, Back, Right, Left, None }
+    public enum DirectType { Forward, Back, Right, Left, None }
 
-    public Direct direct = Direct.None;
-    private Vector3 startDirect, finishDirect;
+    [SerializeField] float speed = 10f;
+    [SerializeField] Transform jiao;
+    [SerializeField] LayerMask raycastLayer;
+
+    private Vector3 startTouchPosition, lastTouchPosition, targetPosition;
+    private Vector3 direction;
+    private bool isMoving = false;
+    private Collider lastCollider;
+    private List<Collider> listBrick;
+    private List<Object> listPlayerBrick;
+
+    private static float unitSize = 1f;
+
+    private void Start()
+    {
+        targetPosition = transform.position;
+        listPlayerBrick = new List<Object>();
+        listBrick = new List<Collider>();
+        direction = Vector3.zero;
+    }
+
+    private void FixedUpdate()
+    {
+        ControlPlayer();
+    }
 
     private void Update()
     {
-        if (Input.GetMouseButtonDown(0))
+        if (!isMoving)
         {
-            startDirect = Input.mousePosition;
+            foreach (Touch touch in Input.touches)
+            {
+                if (touch.phase == TouchPhase.Began)
+                {
+                    startTouchPosition = touch.position;
+                }
+
+                if (touch.phase == TouchPhase.Ended)
+                {
+                    lastTouchPosition = touch.position;
+                    GetFinishPoint(GetDirectType(startTouchPosition, lastTouchPosition));
+                }
+            }
         }
-        if (Input.GetMouseButtonUp(0))
-        {
-            finishDirect = Input.mousePosition;
-            direct = GetDirect(startDirect, finishDirect);
-            Debug.Log(direct);
-        }
-        ControlPlayer(direct);
     }
 
-    private void ControlPlayer(Direct direct)
+    //Moving Player
+    private void ControlPlayer()
+    {
+        if (Vector3.Distance(transform.position, targetPosition) > 0)
+        {
+            isMoving = true;
+            transform.position = Vector3.MoveTowards(transform.position, targetPosition, speed * Time.fixedDeltaTime);
+            ManageBrick();
+        }
+        else
+        {
+            isMoving = false;
+        }
+    }
+
+    private void GetFinishPoint(DirectType direct)
     {
         switch (direct)
         {
-            case Direct.Forward:
-                transform.Translate(Vector3.forward * 2f);
-                ResetDirect();
+            case DirectType.Forward:
+                direction = Vector3.forward;
                 break;
-            case Direct.Back:
-                transform.Translate(Vector3.back * 2f);
-                ResetDirect();
+            case DirectType.Back:
+                direction = Vector3.back;
                 break;
-            case Direct.Right:
-                transform.Translate(Vector3.right * 2f);
-                ResetDirect();
+            case DirectType.Right:
+                direction = Vector3.right;
                 break;
-            case Direct.Left:
-                transform.Translate(Vector3.left * 2f);
-                ResetDirect();
+            case DirectType.Left:
+                direction = Vector3.left;
                 break;
-            case Direct.None:
-                break;
-            default:
+            case DirectType.None:
+                direction = Vector3.zero;
                 break;
         }
+        targetPosition = CheckFinishPoint(direction, transform.position);
     }
 
-    private Direct GetDirect(Vector3 startDirect, Vector3 finishDirect)
+    private DirectType GetDirectType(Vector3 startTouchPosition, Vector3 lastTouchPosition)
     {
-        Debug.Log($"startDirect: {startDirect},finishDirect: {finishDirect} ");
-        if (startDirect != null && finishDirect != null)
+        if (startTouchPosition != lastTouchPosition && startTouchPosition != Vector3.zero && lastTouchPosition != Vector3.zero)
         {
-            Vector3 direction = (finishDirect - startDirect);
-            Debug.Log($"direction: {direction}");
+            Vector3 direction = (lastTouchPosition - startTouchPosition);
             if (Mathf.Abs(direction.x) > Mathf.Abs(direction.y))
             {
-                return direction.x > 0 ? Direct.Right : Direct.Left;
+                return direction.x > 0 ? DirectType.Right : DirectType.Left;
             }
             else
             {
-                return direction.y > 0 ? Direct.Forward : Direct.Back;
+                return direction.y > 0 ? DirectType.Forward : DirectType.Back;
             }
         }
 
-        return Direct.None;
+        return DirectType.None;
     }
 
-    private void ResetDirect()
+    private Vector3 CheckFinishPoint(Vector3 direction, Vector3 startPosition)
     {
-        direct = Direct.None;
+        RaycastHit hit;
+        Vector3 point = startPosition;
+        for (int i = 0; i < 50; i++)
+        {
+            if (Physics.Raycast(point + direction * unitSize + Vector3.up, Vector3.down, out hit, 5f))
+            {
+                if (hit.collider.CompareTag("Brick") || hit.collider.CompareTag("UnBrick"))
+                {
+                    point += direction * unitSize;
+                }
+                else break;
+            }
+        }
+
+        return point;
+    }
+
+    private void ManageBrick()
+    {
+        RaycastHit hit;
+        Ray ray = new Ray(transform.position + Vector3.up, Vector3.down);
+        Debug.DrawRay(transform.position + Vector3.up, Vector3.down, Color.red);
+        if (Physics.Raycast(ray, out hit, 5f, raycastLayer))
+        {
+            if (lastCollider != null
+                && lastCollider != hit.collider)
+            {
+                if (lastCollider.CompareTag("UnBrick"))
+                {
+                    lastCollider.transform.GetChild(0).GetComponent<Brick>().EnableBrick(true);
+                    RemoveBrick();
+                }
+                if (lastCollider.CompareTag("Brick"))
+                {
+                    lastCollider.transform.GetComponent<Brick>().EnableBrick(false);
+                    AddBrick(lastCollider);
+                }
+            }
+            lastCollider = hit.collider;
+        }
+    }
+
+    private void AddBrick(Collider brick)
+    {
+        Debug.Log("Add Brick");
+        jiao.position += new Vector3(0, 0.3f, 0);
+        Object playerBrick = Resources.Load("Prefabs/Objects/Brick");
+        Instantiate(playerBrick, new Vector3(jiao.position.x, 2.5f, jiao.position.z), Quaternion.Euler(-90, 0, 0), jiao);
+        listPlayerBrick.Add(playerBrick);
+        listBrick.Add(brick);
+
+    }
+
+    private void RemoveBrick()
+    {
+        if (listPlayerBrick.Count > 0)
+        {
+            int index = listPlayerBrick.Count - 1;
+            jiao.position -= new Vector3(0, 0.3f, 0);
+            //DestroyImmediate(listBrick[index]);
+            //listBrick.RemoveAt(index);
+            //listBrick.Remove(listBrick[index]);
+        }
+    }
+
+    private void ClearBrick()
+    {
+
     }
 }
