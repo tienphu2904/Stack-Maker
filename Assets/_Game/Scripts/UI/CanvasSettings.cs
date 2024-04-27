@@ -34,6 +34,7 @@ public class CanvasSettings : UICanvas
     public void MainMenuButton()
     {
         Close(0);
+        Time.timeScale = 1;
         GameManager.Instance.SetState(GameManager.GameStatus.Menu);
     }
 
