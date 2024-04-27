@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 
 public class Player : MonoBehaviour
@@ -8,13 +9,12 @@ public class Player : MonoBehaviour
 
     [SerializeField] float speed = 10f;
     [SerializeField] Transform jiao;
-    [SerializeField] LayerMask raycastLayer;
+    [SerializeField] LayerMask raycastLayer, ignoreRaycastLayer;
 
     private Vector3 startTouchPosition, lastTouchPosition, targetPosition;
     private Vector3 direction;
     private bool isMoving = false;
     private Collider lastCollider;
-    private List<Collider> listBrick;
     private List<Object> listPlayerBrick;
 
     private static float unitSize = 1f;
@@ -23,17 +23,18 @@ public class Player : MonoBehaviour
     {
         targetPosition = transform.position;
         listPlayerBrick = new List<Object>();
-        listBrick = new List<Collider>();
         direction = Vector3.zero;
     }
 
     private void FixedUpdate()
     {
+        Debug.Log("FixedUpdate");
         ControlPlayer();
     }
 
     private void Update()
     {
+        Debug.Log("Update");
         if (!isMoving)
         {
             foreach (Touch touch in Input.touches)
@@ -114,69 +115,84 @@ public class Player : MonoBehaviour
         Vector3 point = startPosition;
         for (int i = 0; i < 50; i++)
         {
-            if (Physics.Raycast(point + direction * unitSize + Vector3.up, Vector3.down, out hit, 5f))
+            if (Physics.Raycast(point + direction * unitSize + Vector3.up * 2f, Vector3.down, out hit, 5f))
             {
-                if (hit.collider.CompareTag("Brick") || hit.collider.CompareTag("UnBrick"))
+                if (hit.collider.CompareTag("Brick")
+                    || hit.collider.CompareTag("UnBrick")
+                    || hit.collider.CompareTag("StartPoint")
+                    || hit.collider.CompareTag("FinishPoint"))
                 {
                     point += direction * unitSize;
                 }
                 else break;
             }
         }
-
         return point;
     }
 
+    //Manager Brick
     private void ManageBrick()
     {
         RaycastHit hit;
-        Ray ray = new Ray(transform.position + Vector3.up, Vector3.down);
-        Debug.DrawRay(transform.position + Vector3.up, Vector3.down, Color.red);
+        Ray ray = new Ray(transform.position + Vector3.up - direction * 0.4f, Vector3.down);
         if (Physics.Raycast(ray, out hit, 5f, raycastLayer))
         {
-            if (lastCollider != null
-                && lastCollider != hit.collider)
+            if (lastCollider != hit.collider)
             {
-                if (lastCollider.CompareTag("UnBrick"))
+                if (hit.collider.CompareTag("Brick"))
                 {
-                    lastCollider.transform.GetChild(0).GetComponent<Brick>().EnableBrick(true);
-                    RemoveBrick();
+                    hit.collider.transform.GetComponent<Brick>().EnableBrick(false);
+                    AddBrick();
                 }
-                if (lastCollider.CompareTag("Brick"))
+                if (hit.collider.CompareTag("UnBrick"))
                 {
-                    lastCollider.transform.GetComponent<Brick>().EnableBrick(false);
-                    AddBrick(lastCollider);
+                    if (listPlayerBrick.Count > 0)
+                    {
+                        hit.collider.transform.GetChild(0).GetComponent<Brick>().EnableBrick(true);
+                        hit.collider.gameObject.layer = ignoreRaycastLayer;
+                        RemoveBrick();
+                    }
+                    else
+                    {
+                        GameManager.Instance.SetState(GameManager.GameStatus.Lose);
+                    }
+                }
+                if (hit.collider.CompareTag("FinishPoint"))
+                {
+                    ClearBrick();
+                    GameManager.Instance.SetState(GameManager.GameStatus.Victory);
                 }
             }
             lastCollider = hit.collider;
         }
     }
 
-    private void AddBrick(Collider brick)
+    private void AddBrick()
     {
-        Debug.Log("Add Brick");
+        GameManager.Instance.AddCoin(1);
+        Object playerBrick = Resources.Load("Prefabs/Objects/Brick2");
         jiao.position += new Vector3(0, 0.3f, 0);
-        Object playerBrick = Resources.Load("Prefabs/Objects/Brick");
-        Instantiate(playerBrick, new Vector3(jiao.position.x, 2.5f, jiao.position.z), Quaternion.Euler(-90, 0, 0), jiao);
-        listPlayerBrick.Add(playerBrick);
-        listBrick.Add(brick);
-
+        var brick = Instantiate(playerBrick, new Vector3(jiao.position.x, 2.5f, jiao.position.z), Quaternion.Euler(-90, 180, 0), jiao);
+        listPlayerBrick.Add(brick);
     }
 
     private void RemoveBrick()
     {
-        if (listPlayerBrick.Count > 0)
-        {
-            int index = listPlayerBrick.Count - 1;
-            jiao.position -= new Vector3(0, 0.3f, 0);
-            //DestroyImmediate(listBrick[index]);
-            //listBrick.RemoveAt(index);
-            //listBrick.Remove(listBrick[index]);
-        }
+        int index = listPlayerBrick.Count - 1;
+        jiao.position -= new Vector3(0, 0.3f, 0);
+        Object playerBrick = listPlayerBrick[index];
+        listPlayerBrick.Remove(playerBrick);
+        Destroy(playerBrick);
     }
 
     private void ClearBrick()
     {
-
+        if (listPlayerBrick.Count > 0)
+        {
+            while (listPlayerBrick.Count > 0)
+            {
+                RemoveBrick();
+            }
+        }
     }
 }

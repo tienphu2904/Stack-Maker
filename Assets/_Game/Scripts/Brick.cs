@@ -4,10 +4,6 @@ using UnityEngine;
 
 public class Brick : MonoBehaviour
 {
-    [SerializeField] private LayerMask raycastLayer;
-    [SerializeField] private LayerMask ignoreRaycastLayer;
-
-
     public bool IsEnable
     {
         get
@@ -16,14 +12,8 @@ public class Brick : MonoBehaviour
         }
         set
         {
-            transform.parent.gameObject.layer = value ? ignoreRaycastLayer : raycastLayer;
             transform.gameObject.SetActive(value);
         }
-    }
-
-    private void Start()
-    {
-        IsEnable = transform.gameObject.activeInHierarchy;
     }
 
     public void EnableBrick(bool isEnable)
