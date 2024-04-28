@@ -30,6 +30,7 @@ public class LevelManager : Singleton<LevelManager>
         {
             Debug.Log("Max level!!!");
         }
+        UIManager.Instance.GetUI<CanvasGamePlay>().updateLevelText();
     }
 
     public void InitPlayer(Transform transform)

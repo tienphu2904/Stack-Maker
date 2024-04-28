@@ -25,6 +25,7 @@ public class CanvasSettings : UICanvas
         }
         else if (canvas is CanvasGamePlay)
         {
+            buttons[0].gameObject.SetActive(true);
             buttons[1].gameObject.SetActive(true);
             buttons[2].gameObject.SetActive(true);
 

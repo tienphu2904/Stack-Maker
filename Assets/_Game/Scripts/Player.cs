@@ -28,13 +28,11 @@ public class Player : MonoBehaviour
 
     private void FixedUpdate()
     {
-        Debug.Log("FixedUpdate");
         ControlPlayer();
     }
 
     private void Update()
     {
-        Debug.Log("Update");
         if (!isMoving)
         {
             foreach (Touch touch in Input.touches)
